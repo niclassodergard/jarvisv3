@@ -87,6 +87,31 @@ describe("runAgent", () => {
     expect(s.events).toContainEqual({ type: "tool", name: "boom", status: "error" });
   });
 
+  it("drops dangling tool_use from a cut-off reply", async () => {
+    const s = setup(
+      [
+        msg(
+          [
+            { type: "text", text: "partial", citations: null } as never,
+            { type: "tool_use", id: "t", name: "echo", input: {} } as never,
+          ],
+          "max_tokens",
+        ),
+      ],
+      [echo],
+    );
+    await s.run();
+    const m = s.repo.getMessages(s.conv.id);
+    expect(m).toHaveLength(2);
+    expect(JSON.stringify(m[1]!.content)).not.toContain("tool_use");
+  });
+
+  it("does not store an empty reply", async () => {
+    const s = setup([msg([], "end_turn")], []);
+    await s.run();
+    expect(s.repo.getMessages(s.conv.id)).toHaveLength(1);
+  });
+
   it("caps tool iterations", async () => {
     const s = setup([msg([{ type: "tool_use", id: "t", name: "echo", input: {} } as never], "tool_use")], [echo], 3);
     await expect(s.run()).rejects.toThrow(/3 tool iterations/);

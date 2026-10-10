@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { Repo } from "../db.ts";
 
-export function conversationRoutes(repo: Repo) {
+export function conversationRoutes(repo: Repo, runs: Map<string, AbortController>) {
   const app = new Hono();
 
   app.get("/", (c) => c.json(repo.listConversations()));
@@ -22,6 +22,7 @@ export function conversationRoutes(repo: Repo) {
   });
 
   app.delete("/:id", (c) => {
+    runs.get(c.req.param("id"))?.abort();
     if (!repo.deleteConversation(c.req.param("id"))) return c.json({ error: "Not found" }, 404);
     return c.json({ ok: true });
   });

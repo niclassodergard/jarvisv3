@@ -1,0 +1,25 @@
+[Unit]
+Description=Jarvis chat assistant
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+User=nickus
+WorkingDirectory=/home/nickus/jarvis/app/server
+EnvironmentFile=/home/nickus/.config/jarvis/jarvis.env
+Environment=NODE_ENV=production
+Environment=HOST=100.115.122.103
+Environment=PORT=8080
+Environment=ALLOWED_HOSTS=ubuntu,100.115.122.103
+Environment=DB_PATH=/home/nickus/jarvis/data/jarvis.db
+Environment=TZ=Europe/Stockholm
+ExecStart=/home/nickus/.local/node/bin/node dist/index.js
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/home/nickus/jarvis/data
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

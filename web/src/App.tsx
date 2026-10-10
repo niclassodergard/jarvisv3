@@ -70,10 +70,11 @@ export function App() {
     try {
       if (!id) {
         const c = await api.create();
+        void refreshList();
+        if (activeRef.current !== null) return; // user switched conversations while it was being created
         id = c.id;
         setActiveId(id);
         activeRef.current = id;
-        setConversations((l) => [c, ...l]);
       }
     } catch (e) {
       setError(String(e));
@@ -82,21 +83,25 @@ export function App() {
     const convId = id;
     const reply: DisplayMessage = { key: crypto.randomUUID(), role: "assistant", text: "", tools: [], pending: true };
     setMessages((m) => [...m, { key: crypto.randomUUID(), role: "user", text, tools: [] }, reply]);
-    const update = (fn: (r: DisplayMessage) => void) =>
-      setMessages((ms) => ms.map((m) => (m.key === reply.key ? (fn(m), { ...m, tools: [...m.tools] }) : m)));
+    const update = (fn: (r: DisplayMessage) => DisplayMessage) =>
+      setMessages((ms) => ms.map((m) => (m.key === reply.key ? fn(m) : m)));
 
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     setBusy(true);
     try {
       for await (const ev of sendMessage(convId, text, ctrl.signal)) {
-        if (ev.event === "delta") update((r) => void (r.text += ev.data.text));
+        if (ev.event === "delta") update((r) => ({ ...r, text: r.text + ev.data.text }));
         else if (ev.event === "tool")
           update((r) => {
-            const open = r.tools.find((t) => t.name === ev.data.name && t.status === "running");
-            if (open) open.status = ev.data.status;
-            else r.tools.push({ name: ev.data.name, status: ev.data.status });
+            const idx = r.tools.findIndex((t) => t.name === ev.data.name && t.status === "running");
+            const tools =
+              idx >= 0
+                ? r.tools.map((t, i) => (i === idx ? { ...t, status: ev.data.status } : t))
+                : [...r.tools, { name: ev.data.name, status: ev.data.status }];
+            return { ...r, tools };
           });
+        else if (ev.event === "done") setBusy(false);
         else if (ev.event === "title")
           setConversations((l) => l.map((c) => (c.id === convId ? { ...c, title: ev.data.title } : c)));
         else if (ev.event === "error") setError(ev.data.message);
@@ -104,8 +109,8 @@ export function App() {
     } catch (e) {
       if (!ctrl.signal.aborted) setError(e instanceof Error ? e.message : String(e));
     } finally {
-      update((r) => void (r.pending = false));
-      setBusy(false);
+      update((r) => ({ ...r, pending: false }));
+      if (abortRef.current === ctrl) setBusy(false);
       void refreshList();
     }
   };

@@ -21,7 +21,7 @@ async function makeTitle(user: string, assistant: string): Promise<string | null
     model: config.JARVIS_MODEL,
     max_tokens: 40,
     output_config: { effort: "low" },
-    thinking: { type: "between_tools" } as never,
+    thinking: { type: "between_tools" },
     messages: [
       {
         role: "user",
@@ -34,14 +34,27 @@ async function makeTitle(user: string, assistant: string): Promise<string | null
   return title ? title.slice(0, 80) : null;
 }
 
+// Host-header allowlist: the API has no login and relies on the Tailscale bind, so refuse
+// requests addressed to other names (DNS rebinding from a malicious web page).
+const allowedHosts = new Set(
+  [config.HOST, "localhost", "127.0.0.1", ...(config.ALLOWED_HOSTS?.split(",") ?? [])].map((h) => h.trim()).filter(Boolean),
+);
+const hostAllowed = (hostHeader: string | undefined) => {
+  const host = (hostHeader ?? "").replace(/:\d+$/, "").toLowerCase();
+  return allowedHosts.has(host) || host.endsWith(".ts.net");
+};
+
+const runs = new Map<string, AbortController>();
 const app = new Hono();
+app.use("*", async (c, next) => (hostAllowed(c.req.header("host")) ? next() : c.text("Forbidden", 403)));
 app.get("/api/health", (c) => c.json({ ok: true }));
-app.route("/api/conversations", conversationRoutes(repo));
+app.route("/api/conversations", conversationRoutes(repo, runs));
 app.route(
   "/api/conversations",
   chatRoutes({
     client: client as never,
     repo,
+    runs,
     tools,
     model: config.JARVIS_MODEL,
     effort: config.JARVIS_EFFORT,

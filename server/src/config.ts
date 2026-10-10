@@ -8,6 +8,7 @@ const schema = z.object({
   JARVIS_MODEL: z.string().default("claude-sonnet-5-5"),
   JARVIS_EFFORT: z.enum(["low", "medium", "high"]).default("medium"),
   TZ: z.string().default("Europe/Stockholm"),
+  ALLOWED_HOSTS: z.string().optional(),
   WEB_DIR: z.string().optional(),
 });
 

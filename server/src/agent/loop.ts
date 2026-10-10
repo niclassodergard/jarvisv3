@@ -62,6 +62,7 @@ export async function runAgent(
         model: deps.model,
         max_tokens: deps.maxTokens ?? 16000,
         system: deps.system,
+        cache_control: { type: "ephemeral" },
         messages: history,
         ...(toolDefs.length ? { tools: toolDefs } : {}),
         output_config: { effort: deps.effort },
@@ -87,17 +88,19 @@ export async function runAgent(
     try {
       msg = await stream.finalMessage();
     } catch (err) {
-      if (signal.aborted) {
-        if (partial.trim()) repo.addMessage(conversationId, "assistant", [{ type: "text", text: partial }]);
-        return;
-      }
+      // Keep whatever the user already saw, on abort or failure alike.
+      if (partial.trim()) repo.addMessage(conversationId, "assistant", [{ type: "text", text: partial }]);
+      if (signal.aborted) return;
       throw err;
     }
     totals.input_tokens += msg.usage.input_tokens;
     totals.output_tokens += msg.usage.output_tokens;
 
     if (msg.stop_reason !== "tool_use") {
-      repo.addMessage(conversationId, "assistant", msg.content, msg.usage);
+      // A cut-off reply (max_tokens) may end in a tool_use with no result, which the API rejects
+      // on every later request; an empty reply is rejected too. Keep only blocks that are safe to replay.
+      const safe = msg.content.filter((b) => b.type !== "tool_use");
+      if (safe.length) repo.addMessage(conversationId, "assistant", safe, msg.usage);
       emit({ type: "done", usage: totals });
       return;
     }
@@ -106,7 +109,10 @@ export async function runAgent(
     const results: Anthropic.ToolResultBlockParam[] = [];
     for (const block of msg.content) {
       if (block.type !== "tool_use") continue;
-      if (signal.aborted) return;
+      if (signal.aborted) {
+        results.push({ type: "tool_result", tool_use_id: block.id, content: "Cancelled", is_error: true });
+        continue;
+      }
       emit({ type: "tool", name: block.name, status: "running" });
       const tool = tools.find((t) => t.name === block.name);
       try {
@@ -124,11 +130,11 @@ export async function runAgent(
         emit({ type: "tool", name: block.name, status: "error" });
       }
     }
-    if (signal.aborted) return;
     repo.addMessages(conversationId, [
       { role: "assistant", content: msg.content, usage: msg.usage },
       { role: "user", content: results },
     ]);
+    if (signal.aborted) return;
     history.push({ role: "assistant", content: msg.content }, { role: "user", content: results });
   }
   throw new Error(`Stopped after ${maxIterations} tool iterations`);

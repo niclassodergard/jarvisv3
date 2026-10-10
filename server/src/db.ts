@@ -141,6 +141,13 @@ export class Repo {
     }
   }
 
+  countMessages(conversationId: string): number {
+    const r = this.db.prepare("SELECT COUNT(*) AS n FROM messages WHERE conversation_id = ?").get(conversationId) as {
+      n: number;
+    };
+    return r.n;
+  }
+
   getMessages(conversationId: string): StoredMessage[] {
     const rows = this.db
       .prepare("SELECT * FROM messages WHERE conversation_id = ? ORDER BY seq")

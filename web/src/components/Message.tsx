@@ -1,3 +1,4 @@
+import { memo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -10,7 +11,7 @@ export interface DisplayMessage {
   pending?: boolean;
 }
 
-export function Message({ m }: { m: DisplayMessage }) {
+export const Message = memo(function Message({ m }: { m: DisplayMessage }) {
   return (
     <div className={`msg ${m.role}`}>
       {m.tools.map((t, i) => (
@@ -31,4 +32,4 @@ export function Message({ m }: { m: DisplayMessage }) {
       ) : null}
     </div>
   );
-}
+});
