@@ -37,7 +37,7 @@ async function makeTitle(user: string, assistant: string): Promise<string | null
 // Host-header allowlist: the API has no login and relies on the Tailscale bind, so refuse
 // requests addressed to other names (DNS rebinding from a malicious web page).
 const allowedHosts = new Set(
-  [config.HOST, "localhost", "127.0.0.1", ...(config.ALLOWED_HOSTS?.split(",") ?? [])].map((h) => h.trim()).filter(Boolean),
+  [config.HOST, "localhost", "127.0.0.1", "[::1]", ...(config.ALLOWED_HOSTS?.split(",") ?? [])].map((h) => h.trim().toLowerCase()).filter(Boolean),
 );
 const hostAllowed = (hostHeader: string | undefined) => {
   const host = (hostHeader ?? "").replace(/:\d+$/, "").toLowerCase();

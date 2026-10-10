@@ -26,7 +26,7 @@ export function chatRoutes(deps: ChatDeps) {
     if (!conv) return c.json({ error: "Not found" }, 404);
     if (runs.has(id)) return c.json({ error: "A reply is already in progress" }, 409);
 
-    repo.addMessage(id, "user", [{ type: "text", text: body.data.text }]);
+    const userMsg = repo.addMessage(id, "user", [{ type: "text", text: body.data.text }]);
     const ctrl = new AbortController();
     runs.set(id, ctrl);
     const release = () => {
@@ -49,7 +49,7 @@ export function chatRoutes(deps: ChatDeps) {
         if (current?.title === DEFAULT_TITLE && !ctrl.signal.aborted) {
           const reply = repo
             .getMessages(id)
-            .filter((m) => m.role === "assistant")
+            .filter((m) => m.role === "assistant" && m.seq > userMsg.seq)
             .flatMap((m) => (Array.isArray(m.content) ? m.content : []))
             .map((b) => (b.type === "text" ? b.text : ""))
             .join("");
@@ -62,6 +62,8 @@ export function chatRoutes(deps: ChatDeps) {
           }
         }
       } catch (err) {
+        // Aborted (stop, disconnect, or the conversation was deleted mid-run): nothing to report.
+        if (ctrl.signal.aborted || !repo.getConversation(id)) return;
         console.error("chat error", err);
         await send("error", { message: err instanceof Error ? err.message : "Unknown error" }).catch(() => {});
       } finally {

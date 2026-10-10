@@ -69,14 +69,20 @@ export function App() {
     let id = activeId;
     try {
       if (!id) {
+        setBusy(true);
         const c = await api.create();
-        void refreshList();
-        if (activeRef.current !== null) return; // user switched conversations while it was being created
+        if (activeRef.current !== null) {
+          // User switched conversations while it was being created: drop the orphan.
+          setBusy(false);
+          await api.remove(c.id).catch(() => {});
+          return;
+        }
         id = c.id;
         setActiveId(id);
         activeRef.current = id;
       }
     } catch (e) {
+      setBusy(false);
       setError(String(e));
       return;
     }

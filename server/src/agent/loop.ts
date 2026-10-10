@@ -100,7 +100,7 @@ export async function runAgent(
       // A cut-off reply (max_tokens) may end in a tool_use with no result, which the API rejects
       // on every later request; an empty reply is rejected too. Keep only blocks that are safe to replay.
       const safe = msg.content.filter((b) => b.type !== "tool_use");
-      if (safe.length) repo.addMessage(conversationId, "assistant", safe, msg.usage);
+      if (safe.some((b) => b.type === "text")) repo.addMessage(conversationId, "assistant", safe, msg.usage);
       emit({ type: "done", usage: totals });
       return;
     }
