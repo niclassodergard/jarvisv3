@@ -1,0 +1,10 @@
+key.txt
+.env
+.env.*
+!.env.example
+node_modules
+dist
+data
+*.db
+*.db-*
+.DS_Store
