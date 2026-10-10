@@ -27,6 +27,10 @@ function toDisplay(msgs: StoredMessage[]): DisplayMessage[] {
   return out;
 }
 
+// crypto.randomUUID is unavailable on plain-HTTP non-localhost origins, so use a counter.
+let keyCounter = 0;
+const newKey = () => `local-${Date.now()}-${keyCounter++}`;
+
 export function App() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -87,8 +91,8 @@ export function App() {
       return;
     }
     const convId = id;
-    const reply: DisplayMessage = { key: crypto.randomUUID(), role: "assistant", text: "", tools: [], pending: true };
-    setMessages((m) => [...m, { key: crypto.randomUUID(), role: "user", text, tools: [] }, reply]);
+    const reply: DisplayMessage = { key: newKey(), role: "assistant", text: "", tools: [], pending: true };
+    setMessages((m) => [...m, { key: newKey(), role: "user", text, tools: [] }, reply]);
     const update = (fn: (r: DisplayMessage) => DisplayMessage) =>
       setMessages((ms) => ms.map((m) => (m.key === reply.key ? fn(m) : m)));
 
